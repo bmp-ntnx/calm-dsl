@@ -5,6 +5,7 @@ import sys
 from types import MappingProxyType
 
 from ruamel.yaml import YAML, resolver, SafeRepresenter
+from ruamel.yaml.compat import StringIO
 from calm.dsl.tools import StrictDraft7Validator
 from calm.dsl.tools import get_logging_handle
 from .schema import get_schema_details
@@ -290,10 +291,41 @@ class EntityType(EntityTypeBase):
             cdict["description"] = cls.__doc__ if cls.__doc__ else ""
 
         # Send cls name if it is different from cdict["name"] for round trip
-        if "description" in cdict and cdict["name"] != str(cls):
-            cdict["description"] = '{{"dsl_class_name":"{}"}}\n{}'.format(
-                str(cls), cdict["description"]
-            )
+        if "description" in cdict:
+            description = cdict["description"]
+            sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
+            metadata_ind = description.find(sep_string)
+            if metadata_ind != -1:
+                md_str = description[metadata_ind + len(sep_string):]
+                description = description[:metadata_ind + len(sep_string)]
+                # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
+                class MyRepresenter(SafeRepresenter):
+                    def ignore_aliases(self, data):
+                        return True
+                
+                yaml = YAML(typ="safe")
+                yaml.default_flow_style = False
+                yaml.Representer = MyRepresenter
+                stream = StringIO()
+
+                try:
+                    # TODO add md5sum to check tampering of data
+                    md_obj = yaml.load(md_str)
+                    display_name = md_obj["calm_dsl_metadata"].get("display_name")
+                    dsl_name = cdict.get("name")
+                    if dsl_name:
+                        if display_name and display_name != dsl_name:
+                            cdict["name"] = display_name
+                            cls.__name__ = display_name
+                            md_obj["calm_dsl_metadata"]["dsl_name"] = dsl_name
+                    
+                    
+                    yaml.dump(md_obj, stream)
+                    md_new_str = stream.getvalue()
+                    cdict["description"] = description + "\n" + md_new_str
+
+                except Exception:
+                    LOG.warning("Error while loading metadata from description")
 
         # Add extra info for roundtrip
         # TODO - remove during serialization before sending to server
@@ -309,19 +341,40 @@ class EntityType(EntityTypeBase):
         description = cdict.pop("description", None)
         # kind = cdict.pop('__kind__')
 
-        dsl_class_name = name
         if description is not None:
-            if description.find("\n") != -1:
-                data = description.split("\n")
+            sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
+            metadata_ind = description.find(sep_string)
+            if metadata_ind != -1:
+                md_str = description[metadata_ind + len(sep_string):]
+                description = description[:metadata_ind + len(sep_string)]
+                # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
+                class MyRepresenter(SafeRepresenter):
+                    def ignore_aliases(self, data):
+                        return True
+                
+                yaml = YAML(typ="safe")
+                yaml.default_flow_style = False
+                yaml.Representer = MyRepresenter
+                stream = StringIO()
+
                 try:
-                    dsl_dict = json.loads(data[0])
-                    dsl_class_name = get_valid_identifier(dsl_dict["dsl_class_name"])
-                    description = "\n".join(data[1:])
+                    # TODO add md5sum to check tampering of data
+                    md_obj = yaml.load(md_str)
+                    dsl_name = md_obj["calm_dsl_metadata"].get("dsl_name")
+                    if dsl_name:
+                        if dsl_name and name != dsl_name:
+                            name = dsl_name
+                            md_obj["calm_dsl_metadata"].pop("dsl_name")
+                    
+                    yaml.dump(md_obj, stream)
+                    md_new_str = stream.getvalue()
+                    cdict["description"] = description + "\n" + md_new_str
+
                 except Exception:
-                    pass
+                    LOG.warning("Error while loading metadata from description")
 
         # Impose validation for valid identifier
-        dsl_class_name = get_valid_identifier(dsl_class_name)
+        dsl_class_name = get_valid_identifier(name)
 
         # Convert attribute names to x-calm-dsl-display-name, if given
         attrs = {}
