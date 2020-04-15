@@ -28,13 +28,7 @@ def render_substrate_template(cls, vm_images=[]):
     )
     user_attrs["readiness_probe"] = cls.readiness_probe.get_dict()
 
-    # Update substrate name map and gui name
-    gui_display_name = getattr(cls, "display_name", "")
-    if not gui_display_name:
-        gui_display_name = cls.__name__
-
-    elif gui_display_name != cls.__name__:
-        user_attrs["gui_display_name"] = gui_display_name
+    gui_display_name = cls.get_name()
 
     # updating ui and dsl name mapping
     update_substrate_name(gui_display_name, cls.__name__)

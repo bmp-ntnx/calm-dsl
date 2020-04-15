@@ -269,19 +269,20 @@ class EntityType(EntityTypeBase):
 
         # Merge both attrs. Overwrite user attrs on default attrs
         return {**default_attrs, **user_attrs}
-    
+
     def get_name(cls):
+        """returns the name used for compiled payload"""
 
         description = getattr(cls, "description", "")
         if not description:
-            description =cls.__doc__
+            description = cls.__doc__
 
         display_name = None
         if description is not None:
             sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
             metadata_ind = description.find(sep_string)
             if metadata_ind != -1:
-                md_str = description[metadata_ind + len(sep_string):]
+                md_str = description[metadata_ind + len(sep_string) :]
                 yaml = YAML(typ="safe")
                 try:
                     # TODO check md5sum for verifying tampering of data
@@ -320,13 +321,13 @@ class EntityType(EntityTypeBase):
             sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
             metadata_ind = description.find(sep_string)
             if metadata_ind != -1:
-                md_str = description[metadata_ind + len(sep_string):]
-                description = description[:metadata_ind + len(sep_string)]
+                md_str = description[metadata_ind + len(sep_string) :]
+                description = description[: metadata_ind + len(sep_string)]
                 # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
                 class MyRepresenter(SafeRepresenter):
                     def ignore_aliases(self, data):
                         return True
-                
+
                 yaml = YAML(typ="safe")
                 yaml.default_flow_style = False
                 yaml.Representer = MyRepresenter
@@ -342,8 +343,7 @@ class EntityType(EntityTypeBase):
                             cdict["name"] = display_name
                             cls.__name__ = display_name
                             md_obj["calm_dsl_metadata"]["dsl_name"] = dsl_name
-                    
-                    
+
                     yaml.dump(md_obj, stream)
                     md_new_str = stream.getvalue()
                     cdict["description"] = description + "\n" + md_new_str
@@ -369,13 +369,13 @@ class EntityType(EntityTypeBase):
             sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
             metadata_ind = description.find(sep_string)
             if metadata_ind != -1:
-                md_str = description[metadata_ind + len(sep_string):]
-                description = description[:metadata_ind + len(sep_string)]
+                md_str = description[metadata_ind + len(sep_string) :]
+                description = description[: metadata_ind + len(sep_string)]
                 # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
                 class MyRepresenter(SafeRepresenter):
                     def ignore_aliases(self, data):
                         return True
-                
+
                 yaml = YAML(typ="safe")
                 yaml.default_flow_style = False
                 yaml.Representer = MyRepresenter
@@ -389,7 +389,7 @@ class EntityType(EntityTypeBase):
                         if dsl_name and name != dsl_name:
                             name = dsl_name
                             md_obj["calm_dsl_metadata"].pop("dsl_name")
-                    
+
                     yaml.dump(md_obj, stream)
                     md_new_str = stream.getvalue()
                     description = description + "\n" + md_new_str

@@ -24,13 +24,7 @@ def render_service_template(cls):
         cls.__name__
     )
 
-    # Update service name map and gui name
-    gui_display_name = getattr(cls, "display_name", "")
-    if not gui_display_name:
-        gui_display_name = cls.__name__
-
-    elif gui_display_name != cls.__name__:
-        user_attrs["gui_display_name"] = gui_display_name
+    gui_display_name = cls.get_name()
 
     # updating ui and dsl name mapping
     update_service_name(gui_display_name, cls.__name__)

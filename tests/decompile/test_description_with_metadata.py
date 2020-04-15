@@ -130,8 +130,6 @@ class DefaultProfile(Profile):
       display_name: default profile
     """
 
-    display_name = "default profile"
-
     nameserver = CalmVariable.Simple(DNS_SERVER, label="Local DNS resolver")
     foo1 = CalmVariable.Simple("bar1", runtime=True)
     foo2 = CalmVariable.Simple("bar2", runtime=True)
