@@ -324,13 +324,8 @@ class EntityType(EntityTypeBase):
                 md_str = description[metadata_ind + len(sep_string) :]
                 description = description[: metadata_ind + len(sep_string)]
                 # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
-                class MyRepresenter(SafeRepresenter):
-                    def ignore_aliases(self, data):
-                        return True
-
                 yaml = YAML(typ="safe")
                 yaml.default_flow_style = False
-                yaml.Representer = MyRepresenter
                 stream = StringIO()
 
                 try:
@@ -344,6 +339,7 @@ class EntityType(EntityTypeBase):
                             cls.__name__ = display_name
                             md_obj["calm_dsl_metadata"]["dsl_name"] = dsl_name
 
+                    import pdb; pdb.set_trace()
                     yaml.dump(md_obj, stream)
                     md_new_str = stream.getvalue()
                     cdict["description"] = description + "\n" + md_new_str
@@ -372,13 +368,8 @@ class EntityType(EntityTypeBase):
                 md_str = description[metadata_ind + len(sep_string) :]
                 description = description[: metadata_ind + len(sep_string)]
                 # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
-                class MyRepresenter(SafeRepresenter):
-                    def ignore_aliases(self, data):
-                        return True
-
                 yaml = YAML(typ="safe")
                 yaml.default_flow_style = False
-                yaml.Representer = MyRepresenter
                 stream = StringIO()
 
                 try:
