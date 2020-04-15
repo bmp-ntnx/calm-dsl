@@ -269,6 +269,30 @@ class EntityType(EntityTypeBase):
 
         # Merge both attrs. Overwrite user attrs on default attrs
         return {**default_attrs, **user_attrs}
+    
+    def get_name(cls):
+
+        description = getattr(cls, "description", "")
+        if not description:
+            description =cls.__doc__
+
+        display_name = None
+        if description is not None:
+            sep_string = "### Calm DSL Metadata/Hints (Do not edit/change)"
+            metadata_ind = description.find(sep_string)
+            if metadata_ind != -1:
+                md_str = description[metadata_ind + len(sep_string):]
+                yaml = YAML(typ="safe")
+                try:
+                    # TODO check md5sum for verifying tampering of data
+                    md_obj = yaml.load(md_str)
+                    dsl_metadata = md_obj.get("calm_dsl_metadata", {})
+                    display_name = dsl_metadata.get("display_name", None)
+
+                except Exception:
+                    LOG.warning("Error while loading metadata from description")
+
+        return display_name or getattr(cls, "name", None) or cls.__name__
 
     def compile(cls):
 
@@ -368,7 +392,7 @@ class EntityType(EntityTypeBase):
                     
                     yaml.dump(md_obj, stream)
                     md_new_str = stream.getvalue()
-                    cdict["description"] = description + "\n" + md_new_str
+                    description = description + "\n" + md_new_str
 
                 except Exception:
                     LOG.warning("Error while loading metadata from description")
@@ -482,15 +506,7 @@ class EntityType(EntityTypeBase):
         bases = (Entity,)
         if ref:
             attrs = {}
-            if isinstance(cls, ref):
-                # As ref objects do not have display_name attribute
-                attrs["name"] = getattr(cls, "name", "")
-            else:
-                # Service, Packages etc. classes have display_name attribute
-                attrs["name"] = getattr(cls, "display_name", "")
-
-            if not attrs["name"]:
-                attrs["name"] = str(cls)
+            attrs["name"] = cls.get_name()
             attrs["kind"] = kind or getattr(cls, "__kind__")
         return ref(name, bases, attrs)
 
