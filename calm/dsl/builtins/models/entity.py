@@ -323,10 +323,15 @@ class EntityType(EntityTypeBase):
             if metadata_ind != -1:
                 md_str = description[metadata_ind + len(sep_string) :]
                 description = description[: metadata_ind + len(sep_string)]
-                # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
+                count_spaces = len(md_str) - len(md_str.lstrip()) - 1
                 yaml = YAML(typ="safe")
+                yaml.encoding = None
                 yaml.default_flow_style = False
                 stream = StringIO()
+
+                # Transform method to modfy the yaml dump output
+                def tr(s):
+                    return s.replace("\n", "\n{}".format(" " * count_spaces))
 
                 try:
                     # TODO add md5sum to check tampering of data
@@ -339,10 +344,11 @@ class EntityType(EntityTypeBase):
                             cls.__name__ = display_name
                             md_obj["calm_dsl_metadata"]["dsl_name"] = dsl_name
 
-                    import pdb; pdb.set_trace()
-                    yaml.dump(md_obj, stream)
+                    yaml.dump(md_obj, stream, transform=tr)
                     md_new_str = stream.getvalue()
-                    cdict["description"] = description + "\n" + md_new_str
+                    cdict["description"] = (
+                        description + "\n{}".format(" " * count_spaces) + md_new_str
+                    )
 
                 except Exception:
                     LOG.warning("Error while loading metadata from description")
@@ -367,10 +373,15 @@ class EntityType(EntityTypeBase):
             if metadata_ind != -1:
                 md_str = description[metadata_ind + len(sep_string) :]
                 description = description[: metadata_ind + len(sep_string)]
-                # count_spaces = len(md_str) - len(md_str.lstrip()) - 1
+                count_spaces = len(md_str) - len(md_str.lstrip()) - 1
                 yaml = YAML(typ="safe")
                 yaml.default_flow_style = False
+                yaml.encoding = None
                 stream = StringIO()
+
+                # Transform method to modfy the yaml dump output
+                def tr(s):
+                    return s.replace("\n", "\n{}".format(" " * count_spaces))
 
                 try:
                     # TODO add md5sum to check tampering of data
@@ -381,9 +392,11 @@ class EntityType(EntityTypeBase):
                             name = dsl_name
                             md_obj["calm_dsl_metadata"].pop("dsl_name")
 
-                    yaml.dump(md_obj, stream)
+                    yaml.dump(md_obj, stream, transform=tr)
                     md_new_str = stream.getvalue()
-                    description = description + "\n" + md_new_str
+                    description = (
+                        description + "\n{}".format(" " * count_spaces) + md_new_str
+                    )
 
                 except Exception:
                     LOG.warning("Error while loading metadata from description")
