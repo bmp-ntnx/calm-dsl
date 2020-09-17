@@ -1,5 +1,5 @@
 NAME    := ntnx/calm-dsl
-VERSION := $(shell git describe --abbrev=0 --tags 2>/dev/null || echo v0.9.0-alpha)
+VERSION := $(shell git describe --abbrev=0 --tags 2>/dev/null || cat CalmVersion)
 COMMIT  := $(shell git rev-parse --short HEAD)
 TAG     := $(shell git describe --abbrev=0 --tags --exact-match ${COMMIT} 2>/dev/null \
 		|| echo ${VERSION}.$(shell date +"%Y.%m.%d").commit.${COMMIT})
@@ -9,15 +9,15 @@ dev:
 	# This step assumes python3 is installed on your dev machine
 	[ -f venv/bin/python3 ] || (virtualenv -p python3 venv && \
 		venv/bin/pip3 install --upgrade pip setuptools)
-	venv/bin/pip3 install --no-cache -r requirements.txt -r dev-requirements.txt
+	venv/bin/pip3 install --use-feature=2020-resolver --no-cache -r requirements.txt -r dev-requirements.txt
 	venv/bin/python3 setup.py develop
 
 test: dev
 	venv/bin/calm update cache
-	venv/bin/py.test -v --durations 10 -m "not slow" --ignore=examples/
+	venv/bin/py.test -v -rsx --durations 10 -m "not slow" --ignore=examples/
 
 test-all: test
-	venv/bin/py.test -v -m "slow"
+	venv/bin/py.test -v -rsx -m "slow"
 
 gui: dev
 	# Setup Jupyter
@@ -53,14 +53,14 @@ docker: dist
 		docker tag ${NAME}:${TAG} ${NAME}:latest
 
 black:
-	black --exclude '/(\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|venv|_build|buck-out|build|dist|examples)/' .
+	black .
 
 run:
 	docker run -it ${NAME}
 
 _init_centos:
 	# Lets get python3 in
-	rpm -q epel-release || sudo yum -y install epel-release
+	rpm -q epel-release || sudo yum -y install epel-release openssl-devel
 	# Not needed: This has a modern git
 	# rpm -q wandisco-git-release || sudo yum install -y http://opensource.wandisco.com/centos/7/git/x86_64/wandisco-git-release-7-2.noarch.rpm || :
 	#sudo yum update -y git || :
@@ -73,4 +73,4 @@ _init_centos:
 	rpm -q python36 || sudo yum -y install python36 python-pip python3-devel
 
 	# Install virtual env
-	sudo pip install -U virtualenv
+	sudo pip install -U virtualenv==20.0.18

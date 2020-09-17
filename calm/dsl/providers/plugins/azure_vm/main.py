@@ -20,6 +20,13 @@ class AzureVmProvider(Provider):
         client = get_api_client()
         create_spec(client)
 
+    @classmethod
+    def get_api_obj(cls):
+        """returns object to call azure provider specific apis"""
+
+        client = get_api_client()
+        return Azure(client.connection)
+
 
 class Azure:
     def __init__(self, connection):
@@ -300,9 +307,7 @@ def create_spec(client):
         raise Exception("[{}] - {}".format(err["code"], err["error"]))
 
     project = res.json()
-    accounts = project["status"]["project_status"]["resources"][
-        "account_reference_list"
-    ]
+    accounts = project["status"]["resources"]["account_reference_list"]
 
     reg_accounts = []
     for account in accounts:

@@ -23,8 +23,15 @@ class VCenterVmProvider(Provider):
     @classmethod
     def update_vm_image_config(cls, spec, vm_template=None):
         """vm_template is the downloadable class"""
-        if spec.get("template"):
+        if vm_template:
             spec["template"] = vm_template.__name__
+
+    @classmethod
+    def get_api_obj(cls):
+        """returns object to call vmware provider specific apis"""
+
+        client = get_api_client()
+        return VCenter(client.connection)
 
 
 class VCenter:
@@ -259,9 +266,9 @@ class VCenter:
             entity_config = entity["status"]["resources"]["config"]
             entity_id = entity_config["instanceUuid"]
             if entity_id == template_id:
-                controllers = entity_config["hardware"]["device"]["controller"]
-                disks = entity_config["hardware"]["device"]["disk"]
-                networks = entity_config["hardware"]["device"]["network"]
+                controllers = entity_config["hardware"]["device"]["controller"] or []
+                disks = entity_config["hardware"]["device"]["disk"] or []
+                networks = entity_config["hardware"]["device"]["network"] or []
                 break
 
         for controller in controllers:
@@ -383,9 +390,7 @@ def create_spec(client):
         raise Exception("[{}] - {}".format(err["code"], err["error"]))
 
     project = res.json()
-    accounts = project["status"]["project_status"]["resources"][
-        "account_reference_list"
-    ]
+    accounts = project["status"]["resources"]["account_reference_list"]
 
     payload = {"filter": "type==vmware"}
     res, err = client.account.list(payload)

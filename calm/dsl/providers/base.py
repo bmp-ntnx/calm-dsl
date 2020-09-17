@@ -6,7 +6,7 @@ from ruamel import yaml
 from jinja2 import Environment, PackageLoader
 import jsonref
 from calm.dsl.tools import StrictDraft7Validator
-from calm.dsl.tools import get_logging_handle
+from calm.dsl.log import get_logging_handle
 
 LOG = get_logging_handle(__name__)
 
@@ -70,6 +70,19 @@ class Provider(ProviderBase):
     @classmethod
     def create_spec(cls):
         raise NotImplementedError("Create spec not implemented")
+
+    @classmethod
+    def get_api_obj(cls):
+        """returns object to call provider specific apis"""
+
+        raise NotImplementedError("Api object not implemented")
+
+    @classmethod
+    def get_runtime_editables(
+        cls, runtime_spec, project_id, substrate_spec, vm_img_map={}
+    ):
+        # Not implemented right now
+        pass
 
 
 def get_provider(provider_type):

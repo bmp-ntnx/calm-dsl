@@ -10,10 +10,14 @@ class VersionAPI:
 
     def get_calm_version(self):
         return self.connection._call(
-            self.calm_version, verify=False, method=REQUEST.METHOD.GET,
+            self.calm_version, verify=False, method=REQUEST.METHOD.GET
         )
 
     def get_pc_version(self):
         return self.connection._call(
-            self.pc_version, verify=False, method=REQUEST.METHOD.GET,
+            self.pc_version,
+            verify=False,
+            method=REQUEST.METHOD.GET,
+            ignore_error=True,
+            warning_msg="Could not get PC Version",
         )

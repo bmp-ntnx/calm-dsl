@@ -1,20 +1,94 @@
+import sys
+
 from .entity import EntityType, Entity
 from .validator import PropertyValidator
-from calm.dsl.store import Cache
 from .ref import ref
-from .package import PackageType
 
+from .package import PackageType
+from .metadata_payload import get_metadata_obj
+from calm.dsl.store import Cache
+from calm.dsl.config import get_context
+from calm.dsl.log import get_logging_handle
+
+LOG = get_logging_handle(__name__)
 
 # AHV VM Disk
 
 
-ADAPTER_INDEX_MAP = {"SCSI": 0, "PCI": 0, "IDE": 0, "SATA": 0}
-BOOT_CONFIG = {}
+IMAGE_TYPE_MAP = {"DISK": "DISK_IMAGE", "CDROM": "ISO_IMAGE"}
 
 
 class AhvDiskType(EntityType):
     __schema_name__ = "AhvDisk"
     __openapi_type__ = "vm_ahv_disk"
+
+    def compile(cls):
+        cdict = super().compile()
+        # Pop bootable from cdict
+        cdict.pop("bootable", None)
+
+        # Getting the metadata obj
+        metadata_obj = get_metadata_obj()
+        project_ref = metadata_obj.get("project_reference") or dict()
+
+        # If project not found in metadata, it will take project from config
+        context = get_context()
+        project_config = context.get_project_config()
+        project_name = project_ref.get("name") or project_config["name"]
+
+        project_cache_data = Cache.get_entity_data(
+            entity_type="project", name=project_name
+        )
+        if not project_cache_data:
+            LOG.error(
+                "Project {} not found. Please run: calm update cache".format(
+                    project_name
+                )
+            )
+            sys.exit(-1)
+
+        # Fetch Nutanix_PC account registered
+        project_accounts = project_cache_data["accounts_data"]
+        account_uuid = project_accounts.get("nutanix_pc", "")
+
+        if not account_uuid:
+            LOG.error(
+                "No nutanix account registered to project {}".format(project_name)
+            )
+            sys.exit(-1)
+
+        image_ref = cdict.get("data_source_reference") or dict()
+        if image_ref and image_ref["kind"] == "image":
+            image_name = image_ref.get("name")
+            device_type = cdict["device_properties"].get("device_type")
+
+            image_cache_data = Cache.get_entity_data(
+                entity_type="ahv_disk_image",
+                name=image_name,
+                image_type=IMAGE_TYPE_MAP[device_type],
+                account_uuid=account_uuid,
+            )
+            if not image_cache_data:
+                LOG.debug(
+                    "Ahv Disk Image (name = '{}') not found in registered nutanix_pc account (uuid = '{}') in project (name = '{}')".format(
+                        image_name, account_uuid, project_name
+                    )
+                )
+                LOG.error(
+                    "Ahv Disk Image {} not found. Please run: calm update cache".format(
+                        image_name
+                    )
+                )
+                sys.exit(-1)
+
+            image_uuid = image_cache_data.get("uuid", "")
+            cdict["data_source_reference"] = {
+                "kind": "image",
+                "name": image_name,
+                "uuid": image_uuid,
+            }
+
+        return cdict
 
 
 class AhvDiskValidator(PropertyValidator, openapi_type="vm_ahv_disk"):
@@ -28,27 +102,15 @@ def ahv_vm_disk(**kwargs):
     return AhvDiskType(name, bases, kwargs)
 
 
-def get_boot_config():
-    if not BOOT_CONFIG:
-        raise ValueError("There is no bootable disk selected.")
-
-    return BOOT_CONFIG
-
-
 def allocate_on_storage_container(adapter_type="SCSI", size=8):
-    global ADAPTER_INDEX_MAP
     kwargs = {
         "device_properties": {
             "device_type": "DISK",
-            "disk_address": {
-                "adapter_type": adapter_type,
-                "device_index": ADAPTER_INDEX_MAP[adapter_type],
-            },
+            "disk_address": {"adapter_type": adapter_type, "device_index": -1},
         },
         "disk_size_mib": size * 1024,
     }
 
-    ADAPTER_INDEX_MAP[adapter_type] += 1
     return ahv_vm_disk(**kwargs)
 
 
@@ -58,51 +120,29 @@ def update_disk_config(
     if not image_data:
         raise ValueError("Image data not found")
 
-    global ADAPTER_INDEX_MAP
     kwargs = {
         "data_source_reference": image_data,
         "device_properties": {
             "device_type": device_type,
-            "disk_address": {
-                "adapter_type": adapter_type,
-                "device_index": ADAPTER_INDEX_MAP[adapter_type],
-            },
+            "disk_address": {"adapter_type": adapter_type, "device_index": -1},
         },
         "disk_size_mib": 0,
+        "bootable": bootable,
     }
 
-    if bootable:
-        global BOOT_CONFIG
-        BOOT_CONFIG.update(
-            {
-                "boot_device": {
-                    "disk_address": {
-                        "device_index": ADAPTER_INDEX_MAP[adapter_type],
-                        "adapter_type": adapter_type,
-                    }
-                }
-            }
-        )
-
-    ADAPTER_INDEX_MAP[adapter_type] += 1
     return ahv_vm_disk(**kwargs)
 
 
 def clone_from_image_service(
     device_type="DISK", adapter_type="SCSI", image_name="", bootable=False
 ):
+
     if not image_name:
-        raise ValueError("image_name not provided !!!")
+        LOG.error("image_name not provided")
+        sys.exit(-1)
 
-    image_uuid = Cache.get_entity_uuid("AHV_DISK_IMAGE", image_name)
-    if not image_uuid:
-        raise Exception(
-            "Ahv Disk Image {} not found. Please run: calm update cache".format(
-                image_name
-            )
-        )
-
-    image_data = {"kind": "image", "name": image_name, "uuid": image_uuid}
+    # image_uuid will be added at compile time as it requires project context
+    image_data = {"kind": "image", "name": image_name}
 
     return update_disk_config(device_type, adapter_type, image_data, bootable)
 
@@ -110,8 +150,6 @@ def clone_from_image_service(
 def clone_from_vm_image_service(
     device_type="DISK", adapter_type="SCSI", bootable=False, vm_disk_package=None
 ):
-    global ADAPTER_INDEX_MAP
-
     if not vm_disk_package:
         raise ValueError("vm_disk_package not provided !!!")
 
@@ -131,19 +169,14 @@ def clone_from_vm_image_service(
 
 
 def empty_cd_rom(adapter_type="IDE"):
-    global ADAPTER_INDEX_MAP
     kwargs = {
         "device_properties": {
             "device_type": "CDROM",
-            "disk_address": {
-                "adapter_type": adapter_type,
-                "device_index": ADAPTER_INDEX_MAP[adapter_type],
-            },
+            "disk_address": {"adapter_type": adapter_type, "device_index": -1},
         },
         "disk_size_mib": 0,
     }
 
-    ADAPTER_INDEX_MAP[adapter_type] += 1
     return ahv_vm_disk(**kwargs)
 
 

@@ -21,6 +21,13 @@ class AwsVmProvider(Provider):
         client = get_api_client()
         create_spec(client)
 
+    @classmethod
+    def get_api_obj(cls):
+        """returns object to call ahv provider specific apis"""
+
+        client = get_api_client()
+        return AWS(client.connection)
+
 
 class AWS:
     def __init__(self, connection):
@@ -86,9 +93,9 @@ class AWS:
 
     def mixed_images(self, account_id, region_name):
         """Returns a map
-            m[key] = (tupVal1, tupVal2)
-            tupVal1 = id of the image
-            tupVal2 = root_device_name of the image
+        m[key] = (tupVal1, tupVal2)
+        tupVal1 = id of the image
+        tupVal2 = root_device_name of the image
         """
 
         payload = {
@@ -253,9 +260,7 @@ def create_spec(client):
         raise Exception("[{}] - {}".format(err["code"], err["error"]))
 
     project = res.json()
-    accounts = project["status"]["project_status"]["resources"][
-        "account_reference_list"
-    ]
+    accounts = project["status"]["resources"]["account_reference_list"]
 
     reg_accounts = []
     for account in accounts:
